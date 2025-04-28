@@ -1,2 +1,265 @@
-SPEAKER 0
-Hello and welcome to this week's videos. We're going to continue our topic on sort algorithms. And we're going to look at slightly more efficient sorting algorithms. These are going to be quicksort and merge sort. So by the end of this week you should be able to understand and explain both the quicksort and merge sort algorithms. And you should be able to understand the Python implementation for both of these sorting algorithms. So unlike the sorting algorithms we saw last week, the quicksort algorithm is actually quite efficient for sorting and the quicksort algorithm. Just as the binary search algorithm falls under the divide and conquer class of algorithms. This is when we break the problem into smaller chunks, and because they are smaller chunks, they're a lot simpler to solve. So the first thing we're going to do is we're going to talk through the theory of the quicksort algorithm. And then we'll look at an example. So the concept behind quick sorting is partitioning or separating a given list or array. And to partition the list, the first thing we need to do is we need to select something called a pivot. And the pivot will be the thing that we compare all the other elements in the list to. And at the end of the partitioning process, all elements that are less than the pivot will be to the left of the pivot. Pivot, whilst all the elements greater than the pivot will lie to the right of the pivot in the array. And there are a number of different ways that we can select the pivot. But in this case, what we're going to do is we are just going to take the first element in our array or our list. So the quicksort algorithm starts by taking the first element in an array or a list as the pivot. What they were going to then do is we're going to partition an unsorted array into two subarrays. The elements that are on the left side of the pivot should be smaller than the pivot, and all the elements on the right side of the pivot should be greater. Also, after the first iteration of the quicksort algorithm, the chosen pivot point is correctly placed in the list. What we then do is repeat these steps until the array is sorted. So in essence, the main idea behind the quicksort algorithm is to move the elements that are on the wrong side of the pivot value. This is done using something called a partition algorithm, and this is performed using two pointers a left and a right pointer. The left pointer initially points to the value at index one, and the index. The right pointer points to the value at the last index. Note that the left pointer doesn't point to the value at index zero. And this. This is because the value of index zero is our pivot point. So we start with the left pointer, and we move from a left to right direction until we reach a position where the item has a greater value than the pivot value. Similarly, we move the right pointer towards the left until we find a value that is less than the pivot value. What we then do is we swap the values indicated by the left and right pointers. We repeat steps 1 to 3 until both pointers cross each other. In other words, when the right pointer index indicates a value less than that of the left pointer index. Finally, we swap the pivot value with the value at the right point index. So let's look at the example of the quicksort algorithm in action. We've got our list starting with 45 and so on and so forth. And we take the first element in that list as our pivot. In this case the example is 45. And if you remember we have two pointers. The left pointer which starts at index zero one which is the value 23 in this case. And the right pointer that starts at the last index. So what we will then do is we'll move the left pointer until there is a value greater than the pivot. And we'll move the left value sorry. The right pointer left until there is a value less than the pivot. So in this case we're going to move the left pointer to the number 87. And we're going to move the right pointer to the number 32. So now we stop there because we have met our two conditions. 87 is greater than 45, and 32 is less than 45. Once that happens, we swap the two values. So 32 is going to go where 87 is and 87 is going to go with 32 is. So once we swap the values we then continue with our rule. So we're going to move the left pointer once again to the right until it encounters a value that is greater than the pivot point. And we're going to move the right pointer left until it encounters a value that is less than the pivot point. So in this case the left pointer is going to move to 12 and then to 72 and stop there. And the right pointer is going to move to 54 and then to the number four, and it's going to stop there. Once that happens, we do the same thing. So we're going to swap the number 72 with the number four. So once we swap the values we'll notice that the right pointer and the left pointer cross crossover. And what happens at that point is the right pointer is then swapped with the pivot. And you'll see that in this case the four is going to be swapped with the number 45. And at the bottom you can see that our list now looks slightly better. In that 45 is definitely sorted. It's in the correct place. We know that because all the values to the left of the point, uh, the number 45 are less than 45. And we know that the values to the right of the number 45 are all greater than 45. So now we have one number that is sorted into the correct place, and we have two sublists the numbers to the left of 45 and the numbers to the right of 45. So what we're going to do is we're going to treat these as two separate lists, and we're going to apply the quicksort algorithm again. So we're going to pick the pivot. So in this case we'll probably have the number four and the number 72 as pivots. And then we'll have left pointers and right pointers. And we'll follow that algorithm through to the very end. So because this idea of partitioning is very important we'll look at the partitioning part of the implementation first. So the first thing we're going to do is we're going to define a function. It's going to take an array. It's going to take the first index. And it's going to take the last index. And what we're going to do is we're going to say the pivot is going to be whatever is in the first index of the list or the array that we're using. And the pivot index, therefore is the first index or zero in this case. So note that the partition function receives as its parameters both the indices of the first and last elements of the array that we need to partition. So the next thing we're going to do is we're going to define the right pointer and the left pointer. So the right pointer is going to point to the last index of the list we're trying to partition. And the left pointer is going to point to the first index and one position over. So if you remember the pivot is index zero. So the left pointer in a full list is going to point to the first index zero plus one. So it's going to point to index one. So the next thing we're going to do is define the movement of the left pointer and the right pointer. So what we're going to do with the left pointer is going to move along the list from left to right until we reach a point where the item we're looking at is greater than the pivot value. In the same case, we're going to move the right pointer to the left until we find a value that is less than the pivot. And you should see that this is what the Python code in front of you is doing. Once we get to a point where the left value is pointing to a value that is greater than the pivot, and the right pointer is pointing to a value that is less than a pivot. We then use the Python code to swap those two values. The last part of the code that we need to implement is when the left pointer is at a point that is greater than the right pointer. We're going to swap the value of the right pointer with the pivot value. So in this case we're going to swap 43 and four. And you'll see that 43 will then be in the right place in the list. So now we've got to a point where all the elements to the right of the element 43 are greater, and all the items to the left are smaller. That part is complete. And now we'll use the split the split point 43 with the index three. And when. Then we'll recursively sort through the two subarrays. So 43 and 20 and 89 and 77. So in terms of complexity the partition algorithm is O n log n which is basically the partition parts of the algorithm takes own time. And then the dividing and conquering part of it is o log n. If we add those together or sorry, multiply those together, we get o n log n. The quicksort algorithm gives a worst case runtime complexity of o n squared. The worst case complexity for this quicksort algorithm would be when it selects the worst pivot point every single time, and one of the partitions then always has a single element, and this might occur if the list is already sorted. So the worst case complexity would occur if the partition picks the smallest element as the pivot point. When worst case complexity occurs, the quicksort algorithm can be improved using the randomised quicksort, so you are randomising the elements in the list before you then sort it. So the quicksort algorithm is very efficient when sorting large amounts of data compared to other algorithms that we've looked at, such as bubble insertion or selection sort.
+# ---------------------- 自定义数据结构 ----------------------
+class PriorityDeck:
+    """基于优先队列的牌堆管理系统（替换原生deque）"""
+    def __init__(self):
+        self.heap = []
+        self.counter = 0  # 解决相同优先级元素的比较问题
+
+    def push(self, card: 'Card', priority: int = 0) -> None:
+        """添加卡牌到优先队列"""
+        heappush(self.heap, (priority, self.counter, card))
+        self.counter += 1
+
+    def pop(self) -> 'Card':
+        """从队列中取出最高优先级的卡牌"""
+        return heappop(self.heap)[-1] if self.heap else None
+
+    def __len__(self) -> int:
+        return len(self.heap)
+
+
+class DecisionGraph:
+    """基于图结构的AI决策优化系统"""
+    def __init__(self, game_state: 'CrazyEightsGame'):
+        self.graph = defaultdict(list)
+        self.build_graph(game_state)
+
+    def build_graph(self, state: 'CrazyEightsGame') -> None:
+        """构建游戏状态决策图（简化示例）"""
+        for card in state.c_hand:
+            simulated_state = self.simulate_play(state, card)
+            self.graph[state].append((simulated_state, card))
+
+    def find_optimal_play(self) -> Optional['Card']:
+        """使用BFS寻找最优出牌策略（示例逻辑）"""
+        queue = deque([(self.graph[state], 0) for state in self.graph])
+        best_card = None
+        max_score = -float('inf')
+        
+        while queue:
+            current_state, depth = queue.popleft()
+            for next_state, card in current_state:
+                score = self.evaluate_state(next_state)
+                if score > max_score:
+                    max_score = score
+                    best_card = card
+                if depth < 2:  # 限制搜索深度
+                    queue.append((self.graph[next_state], depth + 1))
+        return best_card
+
+    @staticmethod
+    def evaluate_state(state: 'CrazyEightsGame') -> int:
+        """评估游戏状态得分"""
+        return sum(c.value for c in state.c_hand) - sum(p.value for p in state.p_hand)
+
+    @staticmethod
+    def simulate_play(state: 'CrazyEightsGame', card: 'Card') -> 'CrazyEightsGame':
+        """模拟出牌后的新状态"""
+        new_state = CrazyEightsGame()
+        new_state.__dict__ = state.__dict__.copy()
+        new_state.c_hand.remove(card)
+        new_state.up_card = card
+        new_state.active_suit = card.suit
+        return new_state
+
+
+# ---------------------- 核心游戏逻辑 ----------------------
+class Card:
+    """单张扑克牌的类，包含花色、点数和特殊规则"""
+    def __init__(self, suit_id: int, rank_id: int) -> None:
+        self.suit_id = suit_id
+        self.rank_id = rank_id
+
+        # 自动计算牌面属性
+        self.rank, self.value = self._determine_rank_value()
+        self.suit = self._determine_suit()
+        
+        # 生成显示名称
+        self.short_name = f"{self.rank[0]}{self.suit[0]}" if self.rank != '10' else f"{self.rank}{self.suit[0]}"
+        self.long_name = f"{self.rank} of {self.suit}"
+
+    def _determine_rank_value(self) -> Tuple[str, int]:
+        """确定牌面点数和对应的游戏分值"""
+        if self.rank_id == 1:
+            return "Ace", 1
+        elif 2 <= self.rank_id <= 10:
+            return str(self.rank_id), self.rank_id
+        elif self.rank_id == 8:
+            return "8", 50  # 特殊规则：8的分数值为50
+        return {11: ("Jack", 10), 12: ("Queen", 10), 13: ("King", 10)}.get(self.rank_id, ("RankError", -1))
+
+    def _determine_suit(self) -> str:
+        """将数字ID转换为花色名称"""
+        return {1: "Diamonds", 2: "Hearts", 3: "Spades", 4: "Clubs"}.get(self.suit_id, "SuitError")
+
+    def __repr__(self) -> str:
+        return self.short_name
+
+
+class CrazyEightsGame:
+    """主游戏类，管理游戏状态和流程"""
+    def __init__(self) -> None:
+        self.deck: PriorityDeck = PriorityDeck()
+        self.p_hand: List[Card] = []
+        self.c_hand: List[Card] = []
+        self.up_card: Optional[Card] = None
+        self.active_suit: str = ""
+        self.blocked: int = 0
+        self._init_logging()
+
+    def _init_logging(self) -> None:
+        """初始化日志系统"""
+        logging.basicConfig(
+            filename='crazy8.log',
+            level=logging.DEBUG,
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+
+    # ---------------------- 牌堆管理 ----------------------
+    def _custom_shuffle(self, deck: List[Card]) -> List[Card]:
+        """Fisher-Yates洗牌算法（替换random.shuffle）"""
+        for i in range(len(deck)-1, 0, -1):
+            j = random.randint(0, i)
+            deck[i], deck[j] = deck[j], deck[i]
+        return deck
+
+    def init_deck(self) -> None:
+        """初始化并洗牌"""
+        raw_deck = []
+        for suit_id in range(1, 5):
+            for rank_id in range(1, 14):
+                raw_deck.append(Card(suit_id, rank_id))
+        self._custom_shuffle(raw_deck)
+        
+        self.deck = PriorityDeck()
+        for card in raw_deck:
+            self.deck.push(card, random.randint(1, 100))  # 使用优先队列
+
+    # ---------------------- 游戏流程 ----------------------
+    def deal_hands(self) -> None:
+        """发牌逻辑"""
+        self.p_hand = [self.deck.pop() for _ in range(5)]
+        self.c_hand = [self.deck.pop() for _ in range(5)]
+        self.up_card = self.deck.pop()
+        self.active_suit = self.up_card.suit
+        logging.info(f"New round started. Up card: {self.up_card}")
+
+    def _validate_move(self, card: Card) -> bool:
+        """验证出牌合法性"""
+        return any([
+            card.rank == '8',
+            card.suit == self.active_suit,
+            card.rank == self.up_card.rank
+        ])
+
+    # ---------------------- 玩家回合 ----------------------
+    def player_turn(self) -> None:
+        """处理玩家回合"""
+        print("\nYour hand:", ", ".join(card.short_name for card in self.p_hand))
+        print("Up card:", self.up_card.short_name, f"(Active suit: {self.active_suit})")
+
+        while True:
+            try:
+                move = input("Play a card (e.g. '8H') or 'draw': ").strip().upper()
+                if move == 'DRAW':
+                    self._handle_draw(self.p_hand)
+                    return
+
+                selected = next((c for c in self.p_hand if c.short_name == move), None)
+                if not selected:
+                    raise ValueError("Card not in hand")
+                if not self._validate_move(selected):
+                    raise ValueError("Invalid move")
+
+                self._apply_play(selected, self.p_hand)
+                if selected.rank == '8':
+                    self._change_suit()
+                return
+
+            except (ValueError, StopIteration) as e:
+                logging.warning(f"Invalid player input: {str(e)}")
+                print(f"Error: {str(e)}. Please try again.")
+
+    # ---------------------- 电脑AI ----------------------
+    def computer_turn(self) -> None:
+        """使用决策图优化电脑出牌"""
+        logging.info("Computer's turn started")
+        graph = DecisionGraph(self)
+        best_play = graph.find_optimal_play()
+
+        if best_play:
+            self._apply_play(best_play, self.c_hand)
+            print(f"Computer played {best_play.short_name}")
+        else:
+            self._handle_draw(self.c_hand)
+            print("Computer drew a card")
+
+    # ---------------------- 辅助方法 ----------------------
+    def _handle_draw(self, hand: List[Card]) -> None:
+        """处理抽牌逻辑"""
+        if card := self.deck.pop():
+            hand.append(card)
+            logging.info(f"Player drew: {card}")
+        else:
+            self.blocked += 1
+            logging.warning("Deck is empty")
+
+    def _apply_play(self, card: Card, hand: List[Card]) -> None:
+        """应用出牌操作"""
+        hand.remove(card)
+        self.up_card = card
+        self.active_suit = card.suit
+        logging.debug(f"Played: {card}")
+
+    def _change_suit(self) -> None:
+        """玩家出8后更换花色"""
+        suit_map = {'D': 'Diamonds', 'H': 'Hearts', 'S': 'Spades', 'C': 'Clubs'}
+        while True:
+            choice = input("Choose new suit [D/H/S/C]: ").upper()
+            if choice in suit_map:
+                self.active_suit = suit_map[choice]
+                logging.info(f"Suit changed to {self.active_suit}")
+                print(f"New active suit: {self.active_suit}")
+                return
+            print("Invalid choice. Please try again.")
+
+    # ---------------------- 游戏循环 ----------------------
+    def play_game(self) -> None:
+        """主游戏循环"""
+        rounds = random.randint(3, 5)
+        print(f"Starting {rounds}-round game!")
+        total_scores = {'Player': 0, 'Computer': 0}
+
+        for round_num in range(1, rounds+1):
+            print(f"\n=== Round {round_num} ===")
+            self.init_deck()
+            self.deal_hands()
+            self.blocked = 0
+
+            while self.p_hand and self.c_hand and self.blocked < 2:
+                self.player_turn()
+                if not self.p_hand: break
+                self.computer_turn()
+
+            # 计算得分
+            p_score = sum(c.value for c in self.c_hand)
+            c_score = sum(c.value for c in self.p_hand)
+            total_scores['Player'] += p_score
+            total_scores['Computer'] += c_score
+
+        # 显示最终结果
+        print("\n=== Final Scores ===")
+        print(f"Player: {total_scores['Player']}")
+        print(f"Computer: {total_scores['Computer']}")
+        if total_scores['Player'] > total_scores['Computer']:
+            print("🎉 You win the game!")
+        else:
+            print("🤖 Computer wins the game!")
+
+
+if __name__ == "__main__":
+    try:
+        CrazyEightsGame().play_game()
+    except Exception as e:
+        logging.critical(f"Game crashed: {str(e)}", exc_info=True)
+        print("A critical error occurred. Check crazy8.log for details.")

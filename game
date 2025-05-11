@@ -1,0 +1,55 @@
+ID5677583
+
+
+"""
+Main module for Crazy Eights game.
+Serves as the entry point to the game.
+"""
+import pygame
+from src.game import Game
+from src.constants import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+
+def main():
+    """Main function to run the game."""
+    # Initialize pygame
+    pygame.init()
+    pygame.display.set_caption("Crazy Eights")
+    
+    # Create game window
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    clock = pygame.time.Clock()
+    
+    # Create game instance
+    game = Game(screen)
+    
+    # Main game loop
+    running = True
+    while running:
+        # Handle events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            else:
+                game.handle_event(event)
+        
+        # Skip remaining processing if game is closed
+        if not running:
+            break
+            
+        # Update game state
+        game.update()
+        
+        # Render game
+        game.render()
+        
+        # Update display
+        pygame.display.flip()
+        
+        # Control frame rate
+        clock.tick(FPS)
+    
+    # Quit pygame
+    pygame.quit()
+
+if __name__ == "__main__":
+    main() 

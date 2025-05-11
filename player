@@ -1,0 +1,109 @@
+"""
+Player Module
+Implements the Player class for the game.
+"""
+from typing import List, Optional
+from src.card import Card, Suit
+
+class Player:
+    """
+    A player in the Crazy Eights game.
+    
+    Attributes:
+        name (str): The player's name
+        hand (List[Card]): The player's hand of cards
+    """
+    
+    def __init__(self, name: str):
+        """
+        Initialize a new player.
+        
+        Args:
+            name (str): The player's name
+        """
+        self.name = name
+        self.hand: List[Card] = []
+    
+    def add_card(self, card: Card):
+        """
+        Add a card to the player's hand.
+        
+        Args:
+            card (Card): The card to add
+        """
+        self.hand.append(card)
+    
+    def add_cards(self, cards: List[Card]):
+        """
+        Add multiple cards to the player's hand.
+        
+        Args:
+            cards (List[Card]): The cards to add
+        """
+        self.hand.extend(cards)
+    
+    def remove_card(self, card: Card):
+        """
+        Remove a card from the player's hand.
+        
+        Args:
+            card (Card): The card to remove
+            
+        Raises:
+            ValueError: If the card is not in the player's hand
+        """
+        if card not in self.hand:
+            raise ValueError("Card not in hand")
+        self.hand.remove(card)
+    
+    def get_playable_cards(self, up_card: Card, active_suit: Optional[Suit] = None) -> List[Card]:
+        """
+        Get a list of cards that can be played.
+        
+        Args:
+            up_card (Card): The current up card
+            active_suit (Suit, optional): The currently active suit
+            
+        Returns:
+            List[Card]: The list of playable cards
+        """
+        return [card for card in self.hand if card.can_play_on(up_card, active_suit)]
+    
+    def has_playable_card(self, up_card: Card, active_suit: Optional[Suit] = None) -> bool:
+        """
+        Check if the player has any playable cards.
+        
+        Args:
+            up_card (Card): The current up card
+            active_suit (Suit, optional): The currently active suit
+            
+        Returns:
+            bool: True if the player has a playable card, False otherwise
+        """
+        return bool(self.get_playable_cards(up_card, active_suit))
+    
+    def get_hand_value(self) -> int:
+        """
+        Get the total value of the player's hand.
+        
+        Returns:
+            int: The total value of the hand
+        """
+        return sum(card.points for card in self.hand)
+    
+    def is_empty(self) -> bool:
+        """
+        Check if the player's hand is empty.
+        
+        Returns:
+            bool: True if the hand is empty, False otherwise
+        """
+        return len(self.hand) == 0
+    
+    def __len__(self) -> int:
+        """Get the number of cards in the player's hand."""
+        return len(self.hand)
+    
+    def __str__(self) -> str:
+        """Get a string representation of the player."""
+        return f"{self.name} with {len(self)} cards" 

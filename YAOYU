@@ -1,1 +1,265 @@
+"""
+AI Player Module
+Implements the AI player for the game.
+"""
+from typing import List, Optional
+from collections import Counter
+from src.card import Card, Suit
+from src.player import Player
 
+class AIPlayer(Player):
+    """
+    An AI player for the Crazy Eights game.
+    
+    This class extends the Player class with AI decision-making capabilities.
+    """
+    
+    def choose_card(self, up_card: Card, active_suit: Optional[Suit] = None) -> Optional[Card]:
+        """
+        Choose a card to play.
+        
+        Args:
+            up_card (Card): The current up card
+            active_suit (Suit, optional): The currently active suit
+            
+        Returns:
+            Optional[Card]: The chosen card, or None if no card can be played
+        """
+        playable_cards = self.get_playable_cards(up_card, active_suit)
+        if not playable_cards:
+            return None
+        
+        # First come out 8
+        eights = [card for card in playable_cards if card.is_eight]
+        if eights:
+            return eights[0]
+        
+        # Otherwise, play the card with the highest point value
+        return max(playable_cards, key=lambda card: card.points)
+    
+    def choose_suit(self) -> Suit:
+        """
+        Choose a suit when playing an 8.
+        
+        Returns:
+            Suit: The chosen suit
+        """
+        # Count the quantity of each suit
+        suits = [card.suit for card in self.hand]
+        if suits:
+            # Choose the most common suits
+            return Counter(suits).most_common(1)[0][0]
+        
+        # If there are no cards left, randomly select a suit
+        return Suit.DIAMONDS  # Default selection suit
+    
+    def should_draw_card(self, up_card: Card, active_suit: Optional[Suit] = None) -> bool:
+        """
+        Decide whether to draw a card.
+        
+        Args:
+            up_card (Card): The current up card
+            active_suit (Suit, optional): The currently active suit
+            
+        Returns:
+            bool: True if the AI should draw a card, False otherwise
+        """
+        # If there are cards that can be played, no cards will be drawn
+        if self.has_playable_card(up_card, active_suit):
+            return False
+        
+        # If the number of cards in hand is small, one tends to draw cards
+        if len(self.hand) <= 2:
+            return True
+        
+        # If there are 8 cards in the hand, there is a tendency to draw cards
+        if any(card.is_eight for card in self.hand):
+            return True
+        
+        # Other situations are determined randomly
+        return False 
+
+
+
+
+
+
+
+
+"""
+Card Module
+Implements the Card class for the Crazy Eights game.
+"""
+from enum import Enum, auto
+from typing import Tuple
+
+class Suit(Enum):
+    """Card suit enumeration with string representations and color attributes."""
+    DIAMONDS = auto()
+    HEARTS = auto()
+    SPADES = auto()
+    CLUBS = auto()
+    
+    def __str__(self) -> str:
+        """Return the string representation of the suit."""
+        return self.name.capitalize()
+    
+    @property
+    def short_name(self) -> str:
+        """Return the first letter of the suit name."""
+        return self.name[0]
+    
+    @property
+    def color(self) -> Tuple[int, int, int]:
+        """Return the RGB color for the suit."""
+        if self in (Suit.DIAMONDS, Suit.HEARTS):
+            return (255, 0, 0)  # Red
+        return (0, 0, 0)  # Black
+
+class Rank(Enum):
+    """Card rank enumeration with string representations and point values."""
+    ACE = 1
+    TWO = 2
+    THREE = 3
+    FOUR = 4
+    FIVE = 5
+    SIX = 6
+    SEVEN = 7
+    EIGHT = 8
+    NINE = 9
+    TEN = 10
+    JACK = 11
+    QUEEN = 12
+    KING = 13
+    
+    def __str__(self) -> str:
+        """Return the string representation of the rank."""
+        if self.value == 1:
+            return "Ace"
+        elif self.value == 11:
+            return "Jack"
+        elif self.value == 12:
+            return "Queen"
+        elif self.value == 13:
+            return "King"
+        return str(self.value)
+    
+    @property
+    def short_name(self) -> str:
+        """Return the short name of the rank."""
+        if self.value == 1:
+            return "A"
+        elif self.value == 10:
+            return "T"
+        elif self.value == 11:
+            return "J"
+        elif self.value == 12:
+            return "Q"
+        elif self.value == 13:
+            return "K"
+        return str(self.value)
+    
+    @property
+    def points(self) -> int:
+        """Return the point value of the rank."""
+        if self.value == 8:
+            return 50
+        elif self.value >= 10:
+            return 10
+        return self.value
+
+class Card:
+    """
+    Playing card implementation for Crazy Eights.
+    
+    Attributes:
+        suit (Suit): The card's suit (Diamonds, Hearts, Spades, or Clubs)
+        rank (Rank): The card's rank (Ace through King)
+    """
+    
+    def __init__(self, suit: Suit, rank: Rank):
+        """
+        Initialize a new card with the given suit and rank.
+        
+        Args:
+            suit (Suit): The card's suit
+            rank (Rank): The card's rank
+        """
+        self.suit = suit
+        self.rank = rank
+    
+    @property
+    def short_name(self) -> str:
+        """
+        Get the short name of the card (e.g., "AH" for Ace of Hearts).
+        
+        Returns:
+            str: Short string representation of the card
+        """
+        return f"{self.rank.short_name}{self.suit.short_name}"
+    
+    @property
+    def long_name(self) -> str:
+        """
+        Get the long name of the card (e.g., "Ace of Hearts").
+        
+        Returns:
+            str: Full string representation of the card
+        """
+        return f"{self.rank} of {self.suit}"
+    
+    @property
+    def points(self) -> int:
+        """
+        Get the point value of the card.
+        
+        Returns:
+            int: Point value according to Crazy Eights rules
+        """
+        return self.rank.points
+    
+    @property
+    def is_eight(self) -> bool:
+        """
+        Check if this card is an eight.
+        
+        Returns:
+            bool: True if the card is an eight, False otherwise
+        """
+        return self.rank == Rank.EIGHT
+    
+    def can_play_on(self, other: 'Card', active_suit: Suit = None) -> bool:
+        """
+        Check if this card can be played on top of another card.
+        
+        Args:
+            other (Card): The card to play on top of
+            active_suit (Suit, optional): The currently active suit (if changed by an 8)
+            
+        Returns:
+            bool: True if this card can be played, False otherwise
+        """
+        if self.is_eight:
+            return True  # 8 can be played on any card
+        
+        if active_suit and self.suit == active_suit:
+            return True  # Matching the active suit
+            
+        if self.rank == other.rank or self.suit == other.suit:
+            return True  # Matching rank or suit
+            
+        return False
+    
+    def __eq__(self, other: object) -> bool:
+        """Check if two cards are equal."""
+        if not isinstance(other, Card):
+            return NotImplemented
+        return (self.suit == other.suit and self.rank == other.rank)
+    
+    def __repr__(self) -> str:
+        """Get the string representation of the card."""
+        return f"Card({self.suit}, {self.rank})"
+    
+    def __str__(self) -> str:
+        """Get the string representation of the card."""
+        return self.long_name 

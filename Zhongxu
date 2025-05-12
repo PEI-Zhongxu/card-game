@@ -1,0 +1,799 @@
+"""
+ID 5637087
+Game Module
+Implements the core game logic for Crazy Eights.
+"""
+import random
+import logging
+from typing import List, Optional, Tuple
+import pygame
+from src.card import Card, Suit, Rank
+from src.deck import Deck
+from src.player import Player
+from src.ai_player import AIPlayer
+from src.utils.asset_manager import AssetManager
+from src.utils.state_machine import StateMachine, State
+from src.ui.card_sprite import CardSprite
+from src.ui.button import Button
+from src.ui.text import Text
+from src.constants import (
+    SCREEN_WIDTH, SCREEN_HEIGHT, CARD_WIDTH, CARD_HEIGHT,
+    PLAYER_HAND_Y, COMPUTER_HAND_Y, UP_CARD_X, UP_CARD_Y
+)
+
+# Setup logging
+logging.basicConfig(
+    level=logging.ERROR,  # Set log level to ERROR to show only error messages
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("crazy_eights.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("crazy_eights")
+
+class Game:
+    """
+    Main game class that manages the Crazy Eights game.
+    
+    Attributes:
+        screen (pygame.Surface): The screen to render on
+        clock (pygame.time.Clock): The game clock
+        state_machine (StateMachine): The game state machine
+        player (Player): The human player
+        computer (AIPlayer): The computer player
+        deck (Deck): The deck of cards
+        up_card (Card): The current up card
+        active_suit (Suit): The currently active suit
+        card_sprites (List[CardSprite]): The card sprites
+        player_score (int): The player's score
+        computer_score (int): The computer's score
+        current_round (int): The current round number
+        max_rounds (int): The maximum number of rounds
+        assets (AssetManager): The asset manager
+        selected_card (Optional[Card]): The currently selected card
+        dragging (bool): Whether a card is being dragged
+        dragging_sprite (Optional[CardSprite]): The sprite being dragged
+        mouse_pos (Tuple[int, int]): The current mouse position
+        blocked (int): The number of times players have been blocked
+        
+        # AI animation properties
+        ai_card_to_play (Optional[Card]): Card chosen by AI to play
+        ai_animation_sprite (Optional[CardSprite]): Sprite for AI card animation
+        ai_animation_progress (float): Progress of AI card animation
+        ai_animation_start_pos (Tuple[int, int]): Start position of AI card animation
+        ai_animation_end_pos (Tuple[int, int]): End position of AI card animation
+        ai_animation_speed (float): Speed of AI card animation
+        
+        # Suit selection notification
+        show_suit_notification (bool): Whether to show suit notification
+        suit_notification_time (int): Timestamp of suit notification
+        suit_notification_duration (int): Duration of suit notification
+    """
+    
+    def __init__(self, screen: pygame.Surface):
+        """
+        Initialize the game.
+        
+        Args:
+            screen (pygame.Surface): The screen to render on
+        """
+        self.screen = screen
+        self.clock = pygame.time.Clock()
+        self.state_machine = StateMachine(initial_state=State.DEALING)
+        
+        # Game data
+        self.deck = Deck()
+        self.player = Player("Player")
+        self.computer = AIPlayer("Computer")
+        self.up_card: Optional[Card] = None
+        self.active_suit: Optional[Suit] = None
+        self.player_score = 0
+        self.computer_score = 0
+        self.round_num = 1
+        self.total_rounds = 5
+        self.blocked = 0
+        
+        # Sound effects
+        self.assets = AssetManager()
+        
+        # UI elements
+        self.selected_card = None
+        self.dragging: Optional[CardSprite] = None
+        self.showing_rules = False
+        
+        # AI animation properties
+        self.ai_card_to_play = None
+        self.ai_animation_sprite = None
+        self.ai_animation_progress = 0.0
+        self.ai_animation_start_pos = (0, 0)
+        self.ai_animation_end_pos = (UP_CARD_X, UP_CARD_Y)
+        self.ai_animation_speed = 0.02  # Adjusted for smoother animation
+        
+        # Suit selection notification
+        self.show_suit_notification = False
+        self.suit_notification_time = 0
+        self.suit_notification_duration = 2000  # Display for 2 seconds
+        
+        # UI elements
+        self.card_sprites: List[CardSprite] = []
+        self.draw_button = Button(
+            SCREEN_WIDTH - 150, SCREEN_HEIGHT // 2, 100, 40, "Draw Card"
+        )
+        self.suit_buttons = [
+            Button(SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2, 70, 40, "♦ Diamond", (255, 0, 0), (200, 100, 100)),
+            Button(SCREEN_WIDTH // 2 - 80, SCREEN_HEIGHT // 2, 70, 40, "♥ Heart", (255, 0, 0), (200, 100, 100)),
+            Button(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, 70, 40, "♠ Spade", (0, 0, 0), (100, 100, 100)),
+            Button(SCREEN_WIDTH // 2 + 80, SCREEN_HEIGHT // 2, 70, 40, "♣ Club", (0, 0, 0), (100, 100, 100))
+        ]
+        
+        # Add game rules button
+        self.rules_button = Button(
+            SCREEN_WIDTH - 100, 10, 90, 30, "Rules", (50, 50, 100), (100, 100, 200)
+        )
+        
+        # Setup state handlers
+        self._setup_state_handlers()
+        
+        # Initialize game
+        self.init_round()
+    
+    def _setup_state_handlers(self):
+        """Setup the state machine handlers."""
+        self.state_machine.add_state(
+            State.DEALING,
+            enter=self._enter_dealing,
+            update=self._update_dealing
+        )
+        
+        self.state_machine.add_state(
+            State.PLAYER_TURN,
+            enter=self._enter_player_turn,
+            update=self._update_player_turn
+        )
+        
+        self.state_machine.add_state(
+            State.COMPUTER_TURN,
+            enter=self._enter_computer_turn,
+            update=self._update_computer_turn
+        )
+        
+        # Add AI card animation state handler
+        self.state_machine.add_state(
+            State.AI_CARD_ANIMATION,
+            enter=self._enter_ai_card_animation,
+            update=self._update_ai_card_animation
+        )
+        
+        self.state_machine.add_state(
+            State.CHOOSE_SUIT,
+            enter=self._enter_choose_suit,
+            update=self._update_choose_suit
+        )
+        
+        self.state_machine.add_state(
+            State.ROUND_OVER,
+            enter=self._enter_round_over,
+            update=self._update_round_over
+        )
+        
+        self.state_machine.add_state(
+            State.GAME_OVER,
+            enter=self._enter_game_over,
+            update=self._update_game_over
+        )
+    
+    def init_round(self):
+        """Initialize a new round of the game."""
+        self.assets.play_sound("shuffle")
+        
+        # Create and shuffle deck
+        self.deck = Deck()
+        self.deck.shuffle()
+        
+        # Clear hands
+        self.player.hand = []
+        self.computer.hand = []
+        
+        # Deal cards
+        for _ in range(5):
+            self.player.add_card(self.deck.draw())
+            self.computer.add_card(self.deck.draw())
+        
+        # Flip the first card
+        self.up_card = self.deck.draw()
+        self.active_suit = self.up_card.suit
+        
+        # Reset state
+        self.blocked = 0
+        self.state_machine.change_state(State.PLAYER_TURN)
+        
+        # Update UI
+        self.update_card_sprites()
+    
+    def update_card_sprites(self):
+        """Update the card sprite positions and visibility."""
+        # Clear existing sprites
+        old_sprites = self.card_sprites
+        self.card_sprites = []
+        
+        logger.debug("Updating player card sprites...")
+        logger.debug(f"Player hand contents: {[str(card) for card in self.player.hand]}")
+        
+        # Create player hand sprites
+        card_spacing = min(CARD_WIDTH + 10, (SCREEN_WIDTH - 100) // max(1, len(self.player.hand)))
+        for i, card in enumerate(self.player.hand):
+            try:
+                x = 50 + i * card_spacing
+                # Ensure player cards are always face up, pass the actual card object
+                sprite = CardSprite(card, x, PLAYER_HAND_Y, True)
+                logger.debug(f"Creating player card sprite: index={i}, card={card}, face_up=True, position=({x}, {PLAYER_HAND_Y})")
+                self.card_sprites.append(sprite)
+            except Exception as e:
+                logger.error(f"Failed to create player card sprite: index={i}, card={card}, error={e}")
+        
+        logger.debug("Updating computer card sprites...")
+        # Create computer hand sprites (showing backs)
+        card_spacing = min(CARD_WIDTH + 10, (SCREEN_WIDTH - 100) // max(1, len(self.computer.hand)))
+        for i in range(len(self.computer.hand)):
+            try:
+                x = 50 + i * card_spacing
+                # Computer cards pass None to not show specific card content
+                sprite = CardSprite(self.computer.hand[i], x, COMPUTER_HAND_Y, False)
+                logger.debug(f"Creating computer card sprite: index={i}, card={self.computer.hand[i]}, face_up=False, position=({x}, {COMPUTER_HAND_Y})")
+                self.card_sprites.append(sprite)
+            except Exception as e:
+                logger.error(f"Failed to create computer card sprite: index={i}, error={e}")
+        
+        # Create current card sprite
+        if self.up_card:
+            try:
+                sprite = CardSprite(self.up_card, UP_CARD_X, UP_CARD_Y, True)
+                logger.debug(f"Creating center pile sprite: card={self.up_card}, face_up=True, position=({UP_CARD_X}, {UP_CARD_Y})")
+                self.card_sprites.append(sprite)
+            except Exception as e:
+                logger.error(f"Failed to create center pile sprite: card={self.up_card}, error={e}")
+                
+        logger.debug(f"Created a total of {len(self.card_sprites)} card sprites")
+    
+    def handle_event(self, event: pygame.event.Event):
+        """
+        Handle a game event.
+        
+        Args:
+            event (pygame.event.Event): The event to handle
+        """
+        # Handle quit event
+        if event.type == pygame.QUIT:
+            return False  # Let main loop handle QUIT event
+        
+        # Handle rules button click
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rules_button.is_clicked(event.pos):
+                self.showing_rules = not self.showing_rules
+                return True
+        
+        # If showing rules, any click returns to game
+        if self.showing_rules and event.type == pygame.MOUSEBUTTONDOWN:
+            self.showing_rules = False
+            return True
+        
+        # Skip other events if showing rules
+        if self.showing_rules:
+            return True
+        
+        # Handle events based on game state
+        if self.state_machine.current_state == State.PLAYER_TURN:
+            self._handle_player_turn_event(event)
+        elif self.state_machine.current_state == State.CHOOSE_SUIT:
+            self._handle_choose_suit_event(event)
+        elif self.state_machine.current_state == State.ROUND_OVER:
+            self._handle_round_over_event(event)
+        elif self.state_machine.current_state == State.GAME_OVER:
+            self._handle_game_over_event(event)
+            
+        return True
+    
+    def _handle_player_turn_event(self, event: pygame.event.Event):
+        """Handle events during the player's turn."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Handle dragging
+            for sprite in self.card_sprites:
+                if (sprite.face_up and sprite.rect.collidepoint(event.pos) 
+                        and sprite.card in self.player.hand):
+                    self.dragging = sprite
+                    self.dragging.original_pos = (sprite.rect.x, sprite.rect.y)
+                    logger.debug(f"Started dragging card: card={sprite.card}, face_up={sprite.face_up}")
+                    break
+            
+            # Check if draw button was clicked
+            if self.draw_button.is_clicked(event.pos):
+                logger.debug("Draw button clicked")
+                self.draw_card()
+        
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            # Update dragged card position
+            self.dragging.rect.x = event.pos[0] - CARD_WIDTH // 2
+            self.dragging.rect.y = event.pos[1] - CARD_HEIGHT // 2
+        
+        elif event.type == pygame.MOUSEBUTTONUP and self.dragging:
+            # Check if dropped in play area
+            up_card_rect = pygame.Rect(UP_CARD_X - 30, UP_CARD_Y - 30, 
+                                       CARD_WIDTH + 60, CARD_HEIGHT + 60)
+            
+            if up_card_rect.collidepoint(event.pos):
+                # Try to play the card
+                if self.can_play_card(self.dragging.card):
+                    logger.debug(f"Player successfully played card: {self.dragging.card}")
+                    self.play_card(self.dragging.card)
+                else:
+                    # Invalid play, return card to original position
+                    logger.debug(f"Invalid play, card returned to hand: {self.dragging.card}")
+                    self.dragging.reset_position()
+            else:
+                # Not dropped in play area, return card to original position
+                logger.debug(f"Card not dropped in play area, returned to hand: {self.dragging.card}")
+                self.dragging.reset_position()
+            
+            self.dragging = None
+    
+    def _handle_choose_suit_event(self, event: pygame.event.Event):
+        """Handle events in the choose suit state."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Check suit button click
+            for i, button in enumerate(self.suit_buttons):
+                if button.is_clicked(event.pos):
+                    suits = [Suit.DIAMONDS, Suit.HEARTS, Suit.SPADES, Suit.CLUBS]
+                    self.active_suit = suits[i]
+                    
+                    # Show suit selection notification
+                    self.show_suit_notification = True
+                    self.suit_notification_time = pygame.time.get_ticks()
+                    
+                    # Switch to computer turn
+                    self.state_machine.change_state(State.COMPUTER_TURN)
+                    return
+    
+    def _handle_round_over_event(self, event: pygame.event.Event):
+        """Handle events when a round is over."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.round_num += 1
+            if self.round_num <= self.total_rounds:
+                self.init_round()
+            else:
+                self.state_machine.change_state(State.GAME_OVER)
+    
+    def _handle_game_over_event(self, event: pygame.event.Event):
+        """Handle events when the game is over."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Reset game
+            self.__init__(self.screen)
+    
+    def update(self):
+        """Update the game state."""
+        # Update state machine
+        self.state_machine.update()
+        
+        # Update suit selection notification timer
+        if self.show_suit_notification and pygame.time.get_ticks() - self.suit_notification_time > self.suit_notification_duration:
+            self.show_suit_notification = False
+    
+    def render(self):
+        """Render the game state to the screen."""
+        # Draw background
+        self.screen.fill((0, 100, 0))  # Green background
+        
+        # Draw card sprites
+        for i, sprite in enumerate(self.card_sprites):
+            sprite.draw(self.screen, self.assets)
+        
+        # Draw buttons
+        if self.state_machine.current_state == State.PLAYER_TURN:
+            self.draw_button.draw(self.screen)
+        
+        # Draw suit selection buttons
+        if self.state_machine.current_state == State.CHOOSE_SUIT:
+            # Add semi-transparent background
+            overlay = pygame.Surface((SCREEN_WIDTH, 100), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 150))  # Black semi-transparent
+            self.screen.blit(overlay, (0, SCREEN_HEIGHT // 2 - 50))
+            
+            # Add selection prompt
+            font = self.assets.get_font("default", 32)
+            Text("Choose a Suit", font, color=(255, 255, 255), outline_width=2).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 35
+            )
+            
+            # Draw suit selection buttons
+            for button in self.suit_buttons:
+                button.draw(self.screen)
+        
+        # Draw suit selection notification
+        if self.show_suit_notification:
+            # Add semi-transparent background
+            overlay = pygame.Surface((SCREEN_WIDTH, 80), pygame.SRCALPHA)
+            overlay.fill((0, 0, 80, 180))  # Blue semi-transparent
+            self.screen.blit(overlay, (0, 100))
+            
+            # Get suit information
+            suit_symbols = {'HEARTS': '♥', 'DIAMONDS': '♦', 'CLUBS': '♣', 'SPADES': '♠'}
+            suit_names = {'HEARTS': 'Heart', 'DIAMONDS': 'Diamond', 'CLUBS': 'Club', 'SPADES': 'Spade'}
+            suit_colors = {'HEARTS': (255, 0, 0), 'DIAMONDS': (255, 0, 0), 'CLUBS': (0, 0, 0), 'SPADES': (0, 0, 0)}
+            
+            suit_symbol = suit_symbols.get(self.active_suit.name, '')
+            suit_name = suit_names.get(self.active_suit.name, self.active_suit.name)
+            suit_color = suit_colors.get(self.active_suit.name, (255, 255, 255))
+            
+            # Show notification
+            font = self.assets.get_font("default", 32)
+            Text(f"Computer chose {suit_symbol} {suit_name}!", font, color=suit_color, outline_width=2).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, 140
+            )
+        
+        # Draw rules button
+        self.rules_button.draw(self.screen)
+        
+        # Text information
+        self._render_text_info()
+        
+        # Rules display
+        if self.showing_rules:
+            self._render_rules()
+    
+    def _render_text_info(self):
+        """Render text information on the screen."""
+        font = self.assets.get_font("default", 28)
+        
+        # Show current suit
+        suit_symbols = {'HEARTS': '♥', 'DIAMONDS': '♦', 'CLUBS': '♣', 'SPADES': '♠'}
+        suit_names = {'HEARTS': 'Heart', 'DIAMONDS': 'Diamond', 'CLUBS': 'Club', 'SPADES': 'Spade'}
+        suit_colors = {'HEARTS': (255, 0, 0), 'DIAMONDS': (255, 0, 0), 'CLUBS': (0, 0, 0), 'SPADES': (0, 0, 0)}
+        
+        if self.active_suit:
+            suit_symbol = suit_symbols.get(self.active_suit.name, '')
+            suit_name = suit_names.get(self.active_suit.name, self.active_suit.name)
+            suit_color = suit_colors.get(self.active_suit.name, (255, 255, 255))
+            suit_text = f"Current Suit: {suit_symbol} {suit_name}"
+            Text(suit_text, font, color=suit_color, outline_width=2).draw(self.screen, 20, 20)
+        
+        # Show score
+        score_text = f"Player: {self.player_score}  Computer: {self.computer_score}"
+        Text(score_text, font, color=(255, 255, 150), outline_width=2).draw(self.screen, 20, 50)
+        
+        # Show round information
+        round_text = f"Round {self.round_num}/{self.total_rounds}"
+        Text(round_text, font, color=(200, 255, 200), outline_width=2).draw(self.screen, SCREEN_WIDTH - 150, 20)
+        
+        # Show round over or game over message
+        if self.state_machine.current_state == State.ROUND_OVER:
+            # Add semi-transparent overlay
+            overlay = pygame.Surface((SCREEN_WIDTH, 200), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))  # Black semi-transparent
+            self.screen.blit(overlay, (0, SCREEN_HEIGHT // 2 - 100))
+            
+            # Show round result
+            if self.player.is_empty():
+                winner_text = "Player Wins the Round!"
+                round_points = self.computer.get_hand_value()
+                points_text = f"Player earned {round_points} points!"
+            elif self.computer.is_empty():
+                winner_text = "Computer Wins the Round!"
+                round_points = self.player.get_hand_value()
+                points_text = f"Computer earned {round_points} points!"
+            else:
+                winner_text = "Round Draw - Both Blocked!"
+                round_points = 0
+                points_text = "Points awarded to both players"
+            
+            Text(winner_text, font, color=(255, 200, 0), outline_width=2, size=42).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50
+            )
+            
+            Text(points_text, font, color=(255, 150, 0), outline_width=2, size=32).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
+            )
+            
+            Text("Click to continue", font, color=(200, 200, 200), outline_width=2, size=24).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50
+            )
+            
+        elif self.state_machine.current_state == State.GAME_OVER:
+            Text("Game Over!", font, color=(255, 50, 50), outline_width=3, size=52).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 80
+            )
+            winner = "Player Wins!" if self.player_score > self.computer_score else "Computer Wins!" if self.computer_score > self.player_score else "It's a Tie!"
+            Text(winner, font, color=(255, 200, 0), outline_width=2, size=42).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 20
+            )
+            final_score = f"Final Score: Player {self.player_score} - Computer {self.computer_score}"
+            Text(final_score, font, color=(255, 255, 150), outline_width=2, size=32).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40
+            )
+            Text("Click to restart", font, color=(200, 255, 200), outline_width=2, size=28).draw_centered(
+                self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80
+            )
+    
+    def _render_rules(self):
+        """Render the game rules overlay."""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 50, 200))  # Dark blue with alpha
+        self.screen.blit(overlay, (0, 0))
+        
+        # Rules title
+        font_large = self.assets.get_font("default", 36)
+        Text("Crazy Eights - Game Rules", font_large, color=(255, 255, 100), 
+             outline_width=2).draw_centered(self.screen, SCREEN_WIDTH // 2, 60)
+        
+        # Rules content
+        font = self.assets.get_font("default", 24)
+        rule_lines = [
+            "Objective: Be the first to get rid of all your cards.",
+            "",
+            "Game Play:",
+            "• Players take turns playing cards onto the discard pile.",
+            "• Cards must match the top card by either suit or rank.",
+            "• Eights are wild cards - they can be played anytime.",
+            "• When playing an eight, you choose the next suit.",
+            "• If you can't play, draw a card from the deck.",
+            "• If the deck is empty and you can't play, your turn is skipped.",
+            "",
+            "Scoring:",
+            "• When a player goes out, they score points for cards in opponent's hand.",
+            "• Eights = 50 points, face cards = 10 points, other cards = face value.",
+            "• Multiple rounds are played, highest score at the end wins.",
+            "",
+            "Controls:",
+            "• Drag cards to the center pile to play them.",
+            "• Click 'Draw Card' button to draw when you can't play.",
+            "",
+            "Click anywhere to close this help screen."
+        ]
+        
+        y_pos = 120
+        for line in rule_lines:
+            text_color = (255, 255, 255)
+            if line.startswith("Objective:") or line.startswith("Game Play:") or line.startswith("Scoring:") or line.startswith("Controls:"):
+                text_color = (255, 200, 100)
+                
+            Text(line, font, color=text_color, outline_width=1, 
+                 background_color=(0, 0, 80, 150) if line and not line.startswith("•") else None
+                ).draw_centered(self.screen, SCREEN_WIDTH // 2, y_pos)
+            y_pos += 30 if line else 15
+    
+    def can_play_card(self, card: Card) -> bool:
+        """
+        Check if a card can be played on the current up card.
+        
+        Args:
+            card (Card): The card to check
+            
+        Returns:
+            bool: True if the card can be played, False otherwise
+        """
+        return card.can_play_on(self.up_card, self.active_suit)
+    
+    def play_card(self, card: Card):
+        """Play a card from the player's hand."""
+        logger.debug(f"Player played card: {card}")
+        self.assets.play_sound("play")
+        
+        self.player.remove_card(card)
+        self.up_card = card
+        self.active_suit = card.suit
+        
+        # Update card sprites
+        self.update_card_sprites()
+        
+        # Check if player wins
+        if self.player.is_empty():
+            self._check_win_conditions()
+            return
+        
+        # If it's an 8, need to choose suit
+        if card.is_eight:
+            logger.debug("Played an 8, entering suit selection state")
+            self.state_machine.change_state(State.CHOOSE_SUIT)
+        else:
+            self.state_machine.change_state(State.COMPUTER_TURN)
+    
+    def draw_card(self):
+        """Draw a card from the deck into the player's hand."""
+        if not self.deck.is_empty():
+            logger.debug("Player drew card")
+            self.assets.play_sound("deal")
+            card = self.deck.draw()
+            logger.debug(f"Player drew card: {card}")
+            self.player.add_card(card)
+            self.update_card_sprites()
+            
+            # Check if any player wins
+            if self._check_win_conditions():
+                return
+                
+            self.state_machine.change_state(State.COMPUTER_TURN)
+        else:
+            logger.debug("Deck is empty, player cannot draw")
+            self.blocked += 1
+            
+            # Check if both players cannot play
+            if self._check_win_conditions():
+                return
+                
+            self.state_machine.change_state(State.COMPUTER_TURN)
+    
+    def _enter_dealing(self):
+        """Enter the dealing state."""
+        self.assets.play_sound("shuffle")
+    
+    def _update_dealing(self):
+        """Update the dealing state."""
+        # Deal animation completed, enter player turn
+        self.state_machine.change_state(State.PLAYER_TURN)
+    
+    def _enter_player_turn(self):
+        """Enter the player's turn."""
+        pass
+    
+    def _update_player_turn(self):
+        """Update the player's turn."""
+        pass
+    
+    def _enter_computer_turn(self):
+        """Enter the computer's turn."""
+        pass
+    
+    def _update_computer_turn(self):
+        """Update the computer's turn."""
+        # Computer AI decision
+        pygame.time.delay(500)  # Keep slight delay for thinking
+        
+        # Find playable card
+        self.ai_card_to_play = self.computer.choose_card(self.up_card, self.active_suit)
+        
+        if self.ai_card_to_play:
+            # Find corresponding card sprite, prepare to start animation
+            for sprite in self.card_sprites:
+                if not sprite.face_up and hasattr(sprite, 'card') and sprite.card == self.ai_card_to_play:
+                    # Set AI animation parameters
+                    self.ai_animation_sprite = sprite
+                    self.ai_animation_sprite.face_up = True  # Show card face during animation
+                    self.ai_animation_start_pos = (sprite.rect.x, sprite.rect.y)
+                    self.ai_animation_end_pos = (UP_CARD_X, UP_CARD_Y)
+                    self.ai_animation_progress = 0.0
+                    
+                    # Switch to animation state
+                    self.state_machine.change_state(State.AI_CARD_ANIMATION)
+                    return
+        else:
+            # No playable card, draw card
+            if not self.deck.is_empty():
+                self.assets.play_sound("deal")
+                card = self.deck.draw()
+                self.computer.add_card(card)
+            else:
+                self.blocked += 1
+            
+            # Update card sprites
+            self.update_card_sprites()
+            
+            # Check win conditions
+            self._check_win_conditions()
+            
+            # Back to player turn
+            self.state_machine.change_state(State.PLAYER_TURN)
+    
+    def _enter_choose_suit(self):
+        """Enter the suit selection state."""
+        pass
+    
+    def _update_choose_suit(self):
+        """Update the suit selection state."""
+        pass
+    
+    def _enter_round_over(self):
+        """Enter the round over state."""
+        # Calculate score
+        if self.player.is_empty():
+            # Player wins
+            self.player_score += self.computer.get_hand_value()
+        elif self.computer.is_empty():
+            # Computer wins
+            self.computer_score += self.player.get_hand_value()
+        elif self.blocked >= 2:
+            # Both cannot play
+            self.player_score += self.computer.get_hand_value()
+            self.computer_score += self.player.get_hand_value()
+    
+    def _update_round_over(self):
+        """Update the round over state."""
+        pass
+    
+    def _enter_game_over(self):
+        """Enter the game over state."""
+        pass
+    
+    def _update_game_over(self):
+        """Update the game over state."""
+        pass
+    
+    def _check_win_conditions(self):
+        """Check if the round or game is over."""
+        if self.state_machine.current_state in (State.ROUND_OVER, State.GAME_OVER):
+            return True
+        
+        # Check if anyone has played out
+        if self.player.is_empty():
+            # Player wins, but score calculation is done in _enter_round_over
+            self.state_machine.change_state(State.ROUND_OVER)
+            return True
+        elif self.computer.is_empty():
+            # Computer wins, but score calculation is done in _enter_round_over
+            self.state_machine.change_state(State.ROUND_OVER)
+            return True
+        elif self.blocked >= 2:
+            # Both cannot play
+            self.state_machine.change_state(State.ROUND_OVER)
+            return True
+        return False
+    
+    def _enter_ai_card_animation(self):
+        """Enter AI play animation state"""
+        logger.debug("Enter AI play animation state")
+        self.assets.play_sound("play")  # Play play sound
+    
+    def _update_ai_card_animation(self):
+        """Update AI play animation state"""
+        # Increase animation progress
+        self.ai_animation_progress += self.ai_animation_speed
+        
+        if self.ai_animation_progress >= 1.0:
+            # Animation completed, complete play
+            self.ai_animation_progress = 1.0
+            
+            # Update game state
+            self.computer.remove_card(self.ai_card_to_play)
+            self.up_card = self.ai_card_to_play
+            
+            # If it's an 8, computer chooses most common suit
+            if self.ai_card_to_play.is_eight:
+                self.active_suit = self.computer.choose_suit()
+                # Show suit selection notification
+                self.show_suit_notification = True
+                self.suit_notification_time = pygame.time.get_ticks()
+            else:
+                self.active_suit = self.ai_card_to_play.suit
+            
+            # Clear animation related variables
+            self.ai_card_to_play = None
+            self.ai_animation_sprite = None
+            
+            # Update card sprites
+            self.update_card_sprites()
+            
+            # Check win conditions
+            if self._check_win_conditions():
+                return
+            
+            # Back to player turn
+            self.state_machine.change_state(State.PLAYER_TURN)
+        else:
+            # Continue animation, update card position
+            if self.ai_animation_sprite:
+                # Use linear interpolation to calculate current position
+                current_x = self.ai_animation_start_pos[0] + (self.ai_animation_end_pos[0] - self.ai_animation_start_pos[0]) * self.ai_animation_progress
+                current_y = self.ai_animation_start_pos[1] + (self.ai_animation_end_pos[1] - self.ai_animation_start_pos[1]) * self.ai_animation_progress
+                
+                # Update sprite position
+                self.ai_animation_sprite.move_to(int(current_x), int(current_y))
+                
+                # Add rotation effect
+                # Calculate rotation angle: from 0 to random angle, then back to 0
+                if self.ai_animation_progress < 0.5:
+                    # First half of animation: from 0 to max angle
+                    rotation = self.ai_animation_progress * 2 * 360  # 0 to 360 degrees
+                else:
+                    # Second half of animation: from max angle back to 0
+                    rotation = (1.0 - self.ai_animation_progress) * 2 * 360  # 360 to 0 degrees
+                    
+                self.ai_animation_sprite.set_rotation(rotation) 
